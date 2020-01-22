@@ -8,6 +8,13 @@ from tensorflow.keras import Sequential
 from tensorflow.keras import layers
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import Callback
+from tensorflow.keras.layers import BatchNormalization
+from tensorflow.keras.layers import Conv2D
+from tensorflow.keras.layers import MaxPool2D
+from tensorflow.keras.layers import Activation
+from tensorflow.keras.layers import Flatten
+from tensorflow.keras.layers import Dropout
+from tensorflow.keras.layers import Dense
 from azureml.core.run import Run
 from PIL import ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -45,8 +52,6 @@ learning_rate = args.learning_rate
 batch_size = args.batch_size 
 steps_per_epoch = args.steps_per_epoch 
 num_epochs = args.num_epochs 
-dropout_rate = args.dropout_rate 
-activation_function = args.activation_function 
 output_dir = args.output_dir 
 
 # Load classes
@@ -82,19 +87,63 @@ valid_generator = datagen.flow_from_directory(os.path.join(data_dir, 'valid'),
                                               class_mode='categorical',
                                               classes=classes)
 
-# Download base ResNet50 model and set weights to not trainable
-base_model = ResNet50(weights='imagenet', 
-                      include_top=False, 
-                      input_shape=(image_dim, image_dim, 3))
-base_model.trainable = False
+# +
+model = Sequential()
 
-# Add pooling, dropout, and classification layers to base model
-model = Sequential([
-    base_model,
-    layers.GlobalAveragePooling2D(),
-    layers.Dropout(dropout_rate),
-    layers.Dense(len(classes), activation=activation_function)
-])
+# CONV => RELU => POOL
+model.add(Conv2D(32, (3, 3), padding="same", input_shape=(image_dim, image_dim, 3)))
+model.add(Activation("relu"))
+model.add(BatchNormalization(axis=-1))
+model.add(MaxPool2D(pool_size=(3, 3)))
+model.add(Dropout(0.25))
+
+# (CONV => RELU) * 2 => POOL
+model.add(Conv2D(64, (3, 3), padding="same"))
+model.add(Activation("relu"))
+model.add(BatchNormalization(axis=-1))
+model.add(Conv2D(64, (3, 3), padding="same"))
+model.add(Activation("relu"))
+model.add(BatchNormalization(axis=-1))
+model.add(MaxPool2D(pool_size=(2, 2)))
+model.add(Dropout(0.25))
+
+# (CONV => RELU) * 2 => POOL
+model.add(Conv2D(128, (3, 3), padding="same"))
+model.add(Activation("relu"))
+model.add(BatchNormalization(axis=chanDim))
+model.add(Conv2D(128, (3, 3), padding="same"))
+model.add(Activation("relu"))
+model.add(BatchNormalization(axis=chanDim))
+model.add(MaxPool2D(pool_size=(2, 2)))
+model.add(Dropout(0.25))
+
+# first (and only) set of FC => RELU layers
+model.add(Flatten())
+model.add(Dense(1024))
+model.add(Activation("relu"))
+model.add(BatchNormalization())
+model.add(Dropout(0.5))
+
+# softmax classifier
+model.add(Dense(len(classes)))
+model.add(Activation("softmax"))
+
+# +
+# # Download base ResNet50 model and set weights to not trainable
+# base_model = ResNet50(weights='imagenet', 
+#                       include_top=False, 
+#                       input_shape=(image_dim, image_dim, 3))
+# base_model.trainable = False
+
+# +
+# # Add pooling, dropout, and classification layers to base model
+# model = Sequential([
+#     base_model,
+#     layers.GlobalAveragePooling2D(),
+#     layers.Dropout(dropout_rate),
+#     layers.Dense(len(classes), activation=activation_function)
+# ])
+# -
 
 # Compile model with optimizer, loss function, and metrics
 optimizer = Adam(learning_rate=learning_rate, epsilon=1e-08, clipnorm=1.0)
@@ -113,4 +162,4 @@ model.fit_generator(train_generator,
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 model.save(os.path.join(output_dir, 'model.h5'))
-shutil.copyfile('classes.txt', output_dir) 
+shutil.copyfile('classes.txt', os.path.join(output_dir, 'classes.txt')) 
