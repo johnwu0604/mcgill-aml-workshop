@@ -2,7 +2,7 @@ import os
 import shutil
 import argparse
 import numpy as np
-from tensorflow.keras.applications.resnet50 import ResNet50, preprocess_input
+from tensorflow.keras.applications.vgg16 import preprocess_input
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras import Sequential
 from tensorflow.keras import layers
@@ -16,8 +16,7 @@ from tensorflow.keras.layers import Flatten
 from tensorflow.keras.layers import Dropout
 from tensorflow.keras.layers import Dense
 from azureml.core.run import Run
-from PIL import ImageFile
-ImageFile.LOAD_TRUNCATED_IMAGES = True
+from PIL import Image
 
 # Get the Azure ML run object
 run = Run.get_context()
@@ -40,8 +39,6 @@ parser.add_argument('--learning_rate', type=float, default=0.001, help='Learning
 parser.add_argument('--batch_size', type=int, default=16, help='Training batch size')
 parser.add_argument('--steps_per_epoch', type=int, default=100, help='Training steps per epoch')
 parser.add_argument('--num_epochs', type=int, default=25, help='Training number of epochs')
-parser.add_argument('--dropout_rate', type=float, default=0.5, help='Training dropout rate on output layer')
-parser.add_argument('--activation_function', type=str, default='softmax', help='Training activation function')
 parser.add_argument('--output_dir', type=str, default='outputs', help='Output directory')
 args = parser.parse_args()
 
@@ -110,10 +107,10 @@ model.add(Dropout(0.25))
 # (CONV => RELU) * 2 => POOL
 model.add(Conv2D(128, (3, 3), padding="same"))
 model.add(Activation("relu"))
-model.add(BatchNormalization(axis=chanDim))
+model.add(BatchNormalization(axis=-1))
 model.add(Conv2D(128, (3, 3), padding="same"))
 model.add(Activation("relu"))
-model.add(BatchNormalization(axis=chanDim))
+model.add(BatchNormalization(axis=-1))
 model.add(MaxPool2D(pool_size=(2, 2)))
 model.add(Dropout(0.25))
 
@@ -127,22 +124,6 @@ model.add(Dropout(0.5))
 # softmax classifier
 model.add(Dense(len(classes)))
 model.add(Activation("softmax"))
-
-# +
-# # Download base ResNet50 model and set weights to not trainable
-# base_model = ResNet50(weights='imagenet', 
-#                       include_top=False, 
-#                       input_shape=(image_dim, image_dim, 3))
-# base_model.trainable = False
-
-# +
-# # Add pooling, dropout, and classification layers to base model
-# model = Sequential([
-#     base_model,
-#     layers.GlobalAveragePooling2D(),
-#     layers.Dropout(dropout_rate),
-#     layers.Dense(len(classes), activation=activation_function)
-# ])
 # -
 
 # Compile model with optimizer, loss function, and metrics
