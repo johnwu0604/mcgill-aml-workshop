@@ -22,8 +22,7 @@ def run(raw_data):
     with open('temp.jpg', 'wb') as file:
         download = requests.get(image_url, headers=headers)
         file.write(download.content)
-    image = cv2.imread('temp.jpg')
+    image = cv2.imread('temp.jpg').astype(np.float32)/255.0
     image = cv2.resize(image, (image_dim, image_dim))
-    image = tf.cast(image, tf.float32)
     pred = model.predict(np.array([image])).tolist()
     return json.dumps({'prediction': pred})

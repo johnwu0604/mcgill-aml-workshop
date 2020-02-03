@@ -60,6 +60,7 @@ for line in f.readlines():
 
 # Create data generator to augmnent input images
 datagen = ImageDataGenerator(preprocessing_function=preprocess_input,
+                             rescale=1./255,
                              rotation_range=90,
                              width_shift_range=0.1, 
                              height_shift_range=0.1, 
